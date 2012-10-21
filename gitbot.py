@@ -116,7 +116,6 @@ class GitBot(object):
     
     def check_admin(self):
         if not self.admins:
-            self.send("Sorry, but you are not an admin to the channel, so you cannot do that.")
             return False
         
         user = self.msg.split(":", 3)[1].split("!")[0]
