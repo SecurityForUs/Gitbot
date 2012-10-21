@@ -6,41 +6,86 @@ import urllib
 import json
 
 class GitBot(object):
-    def __init__(self, host="irc.freenode.net", port=6667, chan="someweirdchan", nick="gitbot", cmd_start = "gitbot", acct = "github_username"):
+    """
+    @param host: The IRC server to connect to
+    @param port: Port the host is listening on
+    @param chan: The channel on the server to join
+    @param nick: Name of the bot on the channel
+    @param nick_pass: Password for nick (if registered via NickServ)
+    @param cmd_start: Message trigger for bot
+    @param acct: The GitHub account to service
+    """
+    def __init__(self, host="irc.freenode.net", port=6667, chan="someweirdchan", nick="gitbot", nick_pass=None, cmd_start = "gitbot", acct = "balanced"):
         self.chan = chan
         
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((host, port))
         self.send("USER %s %s %s :GitHub IRC bot" % (nick, nick, nick), pm=False)
         self.send("NICK %s" % (nick),pm=False)
+        
+        if nick_pass:
+            self.send("PRIVMSG NickServ identify %s" % (nick_pass))
+            
         self.send("JOIN #%s" % (chan),pm=False)
         
         self.cmd = cmd_start
         self.acct = acct
-        
+    
+    """
+    Closes the socket.
+    """
     def close(self):
         self.sock.close()
-        
-    def github(self, type, call, repo = None, get_args = {}):
+    
+    """
+    Handles GitHub API v3 requests.
+    
+    @param type: Type of API request
+    @param call: API call to be made
+    @param repo: The repo to perform the action on
+    @param get_args: Dictionary ('key' : 'value') of GET arguments
+    """
+    def github(self, type, call, repo = None, get_args = {}, give_acct=True):
+        if give_acct:
+            url = "https://api.github.com/%s/%s/%s/%s" % (type, self.acct, repo, call)
+        else:
+            url = "https://api.github.com/%s/%s" % (type, call)
+            
         if get_args and isinstance(get_args, dict):
-            get_args = urllib.urlencode(get_args)
+            url = "%s?%s" % (url, urllib.urlencode(get_args))
         
-        url = "https://api.github.com/%s/%s/%s/%s/%s" % (type, self.acct, repo, call, get_args)
         print "Sending GitHub request:",url
         
         r = requests.get(url)
         return json.loads(r.content)
     
-    def legacy_github(self, type, action, repo, terms, state = "open"):
-        url = "https://api.github.com/legacy/%s/%s/%s/%s/%s/%s" % (type, action, self.acct, repo, state, terms)
+    """
+    Handles GitHub v2 API (legacy).  Only service for this is searching by keyword for issues by default.
+    """
+    def legacy_github(self, repo, terms, state = "open"):
+        url = "https://api.github.com/legacy/issues/search/%s/%s/%s/%s" % (self.acct, repo, state, terms)
         print "Sending legacy GitHub request:",url
         
         r = requests.get(url)
         return json.loads(r.content)
+    
+    def get_repos(self, user=None):
+        if user:
+            self.acct = user
         
+        r = self.github("user", "repos", get_args={'type' : 'owner'}, give_acct=False)
+        
+        repos = []
+        
+        for repo in r:
+            repos.append(repo['name'])
+            
+        return repos
+    
+    """
+    Parses message sent with the command trigger
+    """
     def getcmd(self, msg):
-        repo_lookup = ['python', 'ach-python', 'api', 'php', 'ach-php', 'ach-ruby', 'ruby', 'js', 'django']
-        
         parts = msg.split(":", 2)[2]
         parts = parts.split(" ", 2)
         
@@ -48,6 +93,8 @@ class GitBot(object):
         args = parts[2]
         
         if cmd == "issue":
+            repo_lookup = self.get_repos()
+            
             parts = args.split(" ", 1)
             
             try:
@@ -97,7 +144,7 @@ class GitBot(object):
             except:
                 pass
         else:
-            call = self.legacy_github("issues", "search", repo, search)
+            call = self.legacy_github(repo, search)
             
             try:
                 issue = call['issues'][0]
