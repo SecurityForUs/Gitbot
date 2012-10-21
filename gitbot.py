@@ -15,22 +15,30 @@ class GitBot(object):
     @param cmd_start: Message trigger for bot
     @param acct: The GitHub account to service
     """
-    def __init__(self, host="irc.freenode.net", port=6667, chan="someweirdchan", nick="gitbot", nick_pass=None, cmd_start = "gitbot", acct = "balanced"):
+    def __init__(self, host="irc.freenode.net", port=6667, chan="someweirdchan", nick="bgitbot", nick_pass=None, cmd_start = "gitbot", acct = "balanced"):
         self.chan = chan
+        self.nick = nick
         
+        print "Connecting %s to %s:%d#%s for GitHub %s with event trigger %s" % (nick, host, port, chan, acct, cmd_start)
+        
+        # Initiate the socket connection and send some generic IRC stuff
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((host, port))
         self.send("USER %s %s %s :GitHub IRC bot" % (nick, nick, nick), pm=False)
         self.send("NICK %s" % (nick),pm=False)
         
+        # If the nick is reserved, authenticate it
         if nick_pass:
+            print "NickServ pass provided: \"%s\"" % (nick_pass)
             self.send("PRIVMSG NickServ identify %s" % (nick_pass))
-            
+        
+        # Join the channel
         self.send("JOIN #%s" % (chan),pm=False)
         
         self.cmd = cmd_start
         self.acct = acct
-    
+        self.repos = None
+        
     """
     Closes the socket.
     """
@@ -38,64 +46,110 @@ class GitBot(object):
         self.sock.close()
     
     """
-    Handles GitHub API v3 requests.
-    
-    @param type: Type of API request
-    @param call: API call to be made
-    @param repo: The repo to perform the action on
-    @param get_args: Dictionary ('key' : 'value') of GET arguments
+    Change the hub to perform actions/API calls on
     """
-    def github(self, type, call, repo = None, get_args = {}, give_acct=True):
-        if give_acct:
-            url = "https://api.github.com/%s/%s/%s/%s" % (type, self.acct, repo, call)
+    def setacct(self, acct):
+        # Only allow change if the account is different
+        if (acct is not self.acct):
+            self.acct = acct
+            self.send("Now checking the hub of %s" % (acct))
+            return True
         else:
-            url = "https://api.github.com/%s/%s" % (type, call)
-            
-        if get_args and isinstance(get_args, dict):
-            url = "%s?%s" % (url, urllib.urlencode(get_args))
+            self.send("Already checking the hub of %s" % (acct))
+            return False
+    
+    """
+    Wrapper to interface with GitHub API.
+    
+    @param api_url: The full URL (minus params) to handle.
+    @param get_args: Any query arguments to pass
+    
+    api_url filters the following:
+    :acct: - The account (set either on init or via setacct()) to perform the action on
+    
+    """
+    def github(self, api_url, get_args = {}):
+        # Dictionary of criteria to filter, and what to replace it with
+        filters = {":acct:" : self.acct}
         
-        print "Sending GitHub request:",url
+        for crit,val in filters.iteritems():
+            api_url = api_url.replace(crit, val)
+        
+        url = "https://api.github.com/%s" % (api_url)
+        
+        if get_args:
+            url = "%s?%s" % (url, urllib.urlencode(get_args))
         
         r = requests.get(url)
         return json.loads(r.content)
-    
+        
     """
     Handles GitHub v2 API (legacy).  Only service for this is searching by keyword for issues by default.
     """
     def legacy_github(self, repo, terms, state = "open"):
-        url = "https://api.github.com/legacy/issues/search/%s/%s/%s/%s" % (self.acct, repo, state, terms)
-        print "Sending legacy GitHub request:",url
-        
-        r = requests.get(url)
-        return json.loads(r.content)
+        return self.github("legacy/issues/search/:acct:/%s/%s/%s" % (repo, state, terms))
     
-    def get_repos(self, user=None):
-        if user:
-            self.acct = user
+    """
+    Gets the repos of 'user' (def.: self.acct).  Returns cached results when possible.
+    
+    @param user: The GitHub username to fetch repos of
+    @param type: Type of repos to get (owner - user created, member - forked, all - both owner & member)
+    @param force: When true, force getting new repos instead of returning cache
+    """
+    def get_repos(self, user=None, type="owner", force=False):
+        # If no force of cache is asked, and the user is the same, return the cache if possible
+        if not force and (user is self.acct or user is None) and self.repos:
+            return self.repos
         
-        r = self.github("user", "repos", get_args={'type' : 'owner'}, give_acct=False)
+        # Get a list of 'user''s repos
+        r = self.github("users/:acct:/repos", get_args={'type' : type})
         
         repos = []
         
+        # Gitbot was originally written for #balanced
         for repo in r:
-            repos.append(repo['name'])
-            
+            repos.append(str(repo['name']).replace("balanced-", ""))
+        
+        self.repos = repos
+        
         return repos
     
+    def check_admin(self):
+        if not self.admins:
+            self.send("Sorry, but you are not an admin to the channel, so you cannot do that.")
+            return False
+        
+        user = self.msg.split(":", 3)[1].split("!")[0]
+        
+        return user in self.admins.keys()
+        
     """
     Parses message sent with the command trigger
     """
     def getcmd(self, msg):
+        # Fetches the actual message from what IRC sends out
         parts = msg.split(":", 2)[2]
+        
+        # Splits the message into parts
         parts = parts.split(" ", 2)
         
+        # Get the command requested
         cmd = str(parts[1]).lower()
-        args = parts[2]
+    
+        # Try to get arguments, otherwise just continue    
+        try:
+            args = parts[2]
+        except:
+            pass
         
         if cmd == "issue":
             repo_lookup = self.get_repos()
             
-            parts = args.split(" ", 1)
+            try:
+                parts = args.split(" ", 1)
+            except:
+                self.send("No arguments were provided.")
+                return False
             
             try:
                 repo = parts[0]
@@ -116,14 +170,22 @@ class GitBot(object):
                     terms = int(terms)
                     self.issue_lookup(repo, "i", terms)
                 except ValueError:
-                    self.issue_lookup(repo, "boob", terms)
-            elif cmd == "acct":
-                self.acct = args
+                    self.issue_lookup(repo, "s", terms)
             else:
                 self.send("Balanced does not have GitHub repo named balanced-%s" % (repo))
+        elif cmd == "hub" and self.check_admin():
+            self.setacct(args)
+        elif cmd == "list":
+            if args == "repo":
+                self.send(json.dumps(self.get_repos()))
+            elif args == "admins":
+                self.send("The following admins are: %s" % (', '.join(self.admins.keys())))
         else:
             self.send("I'm sorry but I do not recognize the command \"%s\" with args \"%s\"" % (cmd, args))
-            
+    
+    """
+    Sends 'msg' to the person marked as 'to'.  If 'pm' is true, send it to the channel, otherwise to the server itself.
+    """
     def send(self, msg, to=None, pm = True):
         if not to:
             to = self.chan
@@ -132,12 +194,13 @@ class GitBot(object):
             self.sock.send("PRIVMSG #%s :%s\n" % (to, msg))
         else:
             self.sock.send("%s\n" % (msg))
-            
+    
+    """
+    Wrote into it's own function to make things simpler for myself.
+    """
     def issue_lookup(self, repo, stype, search):
-        print "Browsing %s of %s for %s" % (repo, stype, search)
-        
         if stype is "i":
-            issue = self.github("repos", "issues", repo, search)
+            issue = self.github("repos/:acct:/%s/issues/%d" % (repo, search))
             
             try:
                 issue['user'] = issue['user']['login']
@@ -156,22 +219,39 @@ class GitBot(object):
         except:
             self.send("Unable to find any open issues with the provided search criteria")
             
-    def recv(self):
+    def recv(self,debug=False):
         msg = str(self.sock.recv(2048)).strip()
+        
+        self.msg = msg
+        
+        if debug:
+            print "msg =",msg
             
         if msg.find("PING") != -1:
             self.send("PONG :back",pm=False)
         elif msg.find(":%s" % (self.cmd)) != -1:
             self.getcmd(msg)
+        elif msg.find("353 %s @ #%s :" % (self.nick, self.chan)) != -1:
+            self.admins = {}
             
-        return True
-        
+            users = msg.split(":", 3)[2].strip().split(" ")
+            
+            for name in users:
+                if name.startswith(("@", "~", "&", "%")):
+                    self.admins[name[1:]] = name[0]
+        elif msg.find("MODE #%s" % (self.chan)) != -1 and msg.find("PRIVMSG") == -1:
+            _,perm,name = msg.split("MODE")[1].strip().split(" ")
+            
+            if perm[0] == "-":
+                del self.admins[name]
+            elif perm[0] == "+":
+                self.admins[name] = "*"
+            
 bot = GitBot()
-stat = True
 
 try:
-    while stat:
-        stat = bot.recv()
+    while True:
+        bot.recv(False)
 except:
     pass
 
