@@ -182,6 +182,12 @@ class GitBot(object):
         elif cmd == "help":
             self.send("Balanced Payments IRC bot written by secforus_ehansen to assist Balanced members in providing GitHub information.  Available commands: list <repo|admins>, issue <repo suffix> <issue # or terms>")
             self.send("Want to improve this bot?  Want to use it for your own channel?  Fork it at https://github.com/SecurityForUs/Gitbot")
+        elif cmd == "make":
+            if args == "me a sandwich":
+                self.send("No")
+        elif cmd == "sudo":
+            if args == "make me a sandwich":
+                self.send("Okay")
         else:
             self.send("I'm sorry but I do not recognize the command \"%s\" with args \"%s\"" % (cmd, args))
     
