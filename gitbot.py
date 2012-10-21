@@ -15,7 +15,7 @@ class GitBot(object):
     @param cmd_start: Message trigger for bot
     @param acct: The GitHub account to service
     """
-    def __init__(self, host="irc.freenode.net", port=6667, chan="someweirdchan", nick="bgitbot", nick_pass=None, cmd_start = "gitbot", acct = "balanced"):
+    def __init__(self, host="irc.freenode.net", port=6667, chan="balanced", nick="balanced-git", nick_pass=None, cmd_start = "gitbot", acct = "balanced"):
         self.chan = chan
         self.nick = nick
         
@@ -179,6 +179,9 @@ class GitBot(object):
                 self.send(json.dumps(self.get_repos()))
             elif args == "admins":
                 self.send("The following admins are: %s" % (', '.join(self.admins.keys())))
+        elif cmd == "help":
+            self.send("Balanced Payments IRC bot written by secforus_ehansen to assist Balanced members in providing GitHub information.  Available commands: list <repo|admins>, issue <repo suffix> <issue # or terms>")
+            self.send("Want to improve this bot?  Want to use it for your own channel?  Fork it at https://github.com/SecurityForUs/Gitbot")
         else:
             self.send("I'm sorry but I do not recognize the command \"%s\" with args \"%s\"" % (cmd, args))
     
