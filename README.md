@@ -8,6 +8,11 @@ Requirements
 Python 2.7 (not tested with any others)
 Requests (to send/receive GitHub API calls)
 
+Installation
+============
+
+    pip install -r requirements.txt
+
 How-To
 ======
 By default, Gitbot connects to Freenode's networks.  To specify different portions:
