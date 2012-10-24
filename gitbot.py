@@ -4,7 +4,6 @@ import socket
 import requests
 import urllib
 import json
-import logging
 import time
 
 class GitBot(object):
@@ -18,8 +17,6 @@ class GitBot(object):
     @param acct: The GitHub account to service
     """
     def __init__(self, host="irc.freenode.net", port=6667, chan="balanced", nick="balanced-git", nick_pass=None, cmd_start = "gitbot", acct = "balanced"):
-        self.logger = logging.getLogger("GitBot")
-        
         self.chan = chan
         self.nick = nick
         
@@ -290,7 +287,7 @@ class GitBot(object):
                 elif perm[0] == "+":
                     self.admins[name] = "*"
 
-bot = GitBot(chan="secforus", nick="sfu%s" % (str(time.time()).split(".")[0]))
+bot = GitBot()
 
 try:
     while True:
