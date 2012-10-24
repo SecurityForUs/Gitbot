@@ -4,6 +4,8 @@ import socket
 import requests
 import urllib
 import json
+import logging
+import time
 
 class GitBot(object):
     """
@@ -16,6 +18,8 @@ class GitBot(object):
     @param acct: The GitHub account to service
     """
     def __init__(self, host="irc.freenode.net", port=6667, chan="balanced", nick="balanced-git", nick_pass=None, cmd_start = "gitbot", acct = "balanced"):
+        self.logger = logging.getLogger("GitBot")
+        
         self.chan = chan
         self.nick = nick
         
@@ -172,6 +176,16 @@ class GitBot(object):
                     self.issue_lookup(repo, "s", terms)
             else:
                 self.send("Balanced does not have GitHub repo named balanced-%s" % (repo))
+        elif cmd == "tell":
+            who,_,repo,phrase = args.split(" ", 3)
+            
+            repo = "balanced-%s" % (repo)
+            
+            try:
+                phrase = int(phrase)
+                self.issue_lookup(repo, "i", phrase, to_who=who)
+            except ValueError:
+                self.issue_lookup(repo, "s",  phrase, to_who=who)
         elif cmd == "hub" and self.check_admin():
             self.setacct(args)
         elif cmd == "list":
@@ -194,72 +208,93 @@ class GitBot(object):
     """
     Sends 'msg' to the person marked as 'to'.  If 'pm' is true, send it to the channel, otherwise to the server itself.
     """
-    def send(self, msg, to=None, pm = True):
-        if not to:
-            to = self.chan
+    def send(self, msg, to=None, pm = True, prefix=None):
+        if to:
+            msg = "%s, %s" % (to, msg)
         
+        if prefix:
+            msg = "%s %s" % (prefix, msg)
+            
         if pm:
-            self.sock.send("PRIVMSG #%s :%s\n" % (to, msg))
+            self.sock.send("PRIVMSG #%s :%s\n" % (self.chan, msg))
         else:
             self.sock.send("%s\n" % (msg))
     
+    def getsender(self):
+        return self.msg.split(":", 3)[1].split("!")[0]
+        
     """
     Wrote into it's own function to make things simpler for myself.
     """
-    def issue_lookup(self, repo, stype, search):
+    def issue_lookup(self, repo, stype, search, to_who=None):
+        issues = []
+        
         if stype is "i":
-            issue = self.github("repos/:acct:/%s/issues/%d" % (repo, search))
-            
+            tmp = self.github("repos/:acct:/%s/issues/%d" % (repo, search))
             try:
-                issue['user'] = issue['user']['login']
+                tmp['user'] = tmp['user']['login']
             except:
                 pass
+            
+            issues.append(tmp)
         else:
             call = self.legacy_github(repo, search)
             
             try:
-                issue = call['issues'][0]
+                issues = call['issues']
             except:
                 pass
-            
+        
+        res = len(issues)
+        
         try:
-            self.send("%s created an issue titled \"%s\" that is %s at %s" % (issue['user'], issue['title'], issue['state'], issue['html_url']))
+            self.send("%s, found %d criteria that match your request." % (self.getsender(), res))
+                
+            i = 1
+            
+            for issue in issues:
+                self.send("%s created an issue titled \"%s\" that is %s at %s" % (issue['user'], issue['title'], issue['state'], issue['html_url']), to=to_who, prefix="[%d/%d]" % (i, res))
+                i += 1
+                time.sleep(2)
         except:
-            self.send("Unable to find any open issues with the provided search criteria")
+            self.send("%s, unable to find any open issues with the provided search criteria" % (self.getsender()))
             
     def recv(self,debug=False):
         msg = str(self.sock.recv(2048)).strip()
         
         self.msg = msg
         
-        if debug:
-            print "msg =",msg
+        lines = msg.split("\n")
+        
+        for msg in lines:
+            if debug:
+                print "msg =",msg
             
-        if msg.find("PING") != -1:
-            self.send("PONG :back",pm=False)
-        elif msg.find(":%s" % (self.cmd)) != -1:
-            self.getcmd(msg)
-        elif msg.find("353 %s @ #%s :" % (self.nick, self.chan)) != -1:
-            self.admins = {}
-            
-            users = msg.split(":", 3)[2].strip().split(" ")
-            
-            for name in users:
-                if name.startswith(("@", "~", "&", "%")):
-                    self.admins[name[1:]] = name[0]
-        elif msg.find("MODE #%s" % (self.chan)) != -1 and msg.find("PRIVMSG") == -1:
-            _,perm,name = msg.split("MODE")[1].strip().split(" ")
-            
-            if perm[0] == "-":
-                del self.admins[name]
-            elif perm[0] == "+":
-                self.admins[name] = "*"
-            
-bot = GitBot()
+            if msg[0:5] == "PING :":
+                self.send("PONG :back")
+            elif msg.find("PRIVMSG #%s :%s" % (self.chan, self.cmd)) != -1:
+                self.getcmd(msg)
+            elif msg.find("353 %s @ #%s :" % (self.nick, self.chan)) != -1:
+                self.admins = {}
+                
+                users = msg.split(":", 3)[2].strip().split(" ")
+                
+                for name in users:
+                    if name.startswith(("@", "~", "&", "%")):
+                        self.admins[name[1:]] = name[0]
+            elif msg.find("MODE #%s" % (self.chan)) != -1 and msg.find("PRIVMSG") == -1:
+                _,perm,name = msg.split("MODE")[1].strip().split(" ")
+                
+                if perm[0] == "-":
+                    del self.admins[name]
+                elif perm[0] == "+":
+                    self.admins[name] = "*"
+
+bot = GitBot(chan="secforus", nick="sfu%s" % (str(time.time()).split(".")[0]))
 
 try:
     while True:
-        bot.recv(False)
+        bot.recv(True)
 except:
     pass
 
