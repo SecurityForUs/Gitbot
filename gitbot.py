@@ -100,20 +100,32 @@ class GitBot(object):
     def get_repos(self, user=None, type="owner", force=False):
         # If no force of cache is asked, and the user is the same, return the cache if possible
         if not force and (user is self.acct or user is None) and self.repos:
-            return self.repos
+            return self.repos.keys()
         
         # Get a list of 'user''s repos
         r = self.github("users/:acct:/repos", get_args={'type' : type})
         
-        repos = []
+        repos = {}
+        prefix = "balanced-"
+        name = ""
         
         # Gitbot was originally written for #balanced
         for repo in r:
-            repos.append(str(repo['name']).replace("balanced-", ""))
-        
+            if repo['name'].find(prefix) != -1:
+                name = repo['name'].replace(prefix, "")
+                repos[name] = prefix
+            else:
+                name = repo['name']
+                repos[name] = ""
+                
         self.repos = repos
         
-        return repos
+        return repos.keys()
+    
+    def repo_name(self, id):
+        pref = self.repos[id]
+        
+        return "%s%s" % (pref, id)
     
     def check_admin(self):
         if not self.admins:
@@ -205,15 +217,17 @@ class GitBot(object):
     """
     Sends 'msg' to the person marked as 'to'.  If 'pm' is true, send it to the channel, otherwise to the server itself.
     """
-    def send(self, msg, to=None, pm = True, prefix=None):
-        if to:
-            msg = "%s, %s" % (to, msg)
-        
+    def send(self, msg, to=None, pm = True, prefix=None, chan=True):
         if prefix:
             msg = "%s %s" % (prefix, msg)
+        
+        if chan:
+            recip = "#%s" % (self.chan)
+        else:
+            recip = to
             
         if pm:
-            self.sock.send("PRIVMSG #%s :%s\n" % (self.chan, msg))
+            self.sock.send("PRIVMSG %s :%s\n" % (recip, msg))
         else:
             self.sock.send("%s\n" % (msg))
     
@@ -245,12 +259,16 @@ class GitBot(object):
         res = len(issues)
         
         try:
-            self.send("%s, found %d criteria that match your request." % (self.getsender(), res))
+            if to_who:
+                self.send("%s, I'm letting %s know about %d results." % (self.getsender(), to_who, res))
+            else:
+                to_who = self.getsender()
+                self.send("%s, found %d criteria that match your request." % (to_who, res))
                 
             i = 1
             
             for issue in issues:
-                self.send("%s created an issue titled \"%s\" that is %s at %s" % (issue['user'], issue['title'], issue['state'], issue['html_url']), to=to_who, prefix="[%d/%d]" % (i, res))
+                self.send("%s created an issue titled \"%s\" that is %s at %s" % (issue['user'], issue['title'], issue['state'], issue['html_url']), to=to_who, prefix="[%d/%d]" % (i, res), chan=False)
                 i += 1
                 time.sleep(2)
         except:
@@ -267,8 +285,9 @@ class GitBot(object):
             if debug:
                 print "msg =",msg
             
-            if msg[0:5] == "PING :":
-                self.send("PONG :back")
+            if msg.find("PING :") != -1:
+                host = msg.split(":")[1]
+                self.send("PONG :%s" % (host), pm=False)
             elif msg.find("PRIVMSG #%s :%s" % (self.chan, self.cmd)) != -1:
                 self.getcmd(msg)
             elif msg.find("353 %s @ #%s :" % (self.nick, self.chan)) != -1:
@@ -287,6 +306,7 @@ class GitBot(object):
                 elif perm[0] == "+":
                     self.admins[name] = "*"
 
+#bot = GitBot(chan="secforus", nick="sfu%d" % (time.time()))
 bot = GitBot()
 
 try:
