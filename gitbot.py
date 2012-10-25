@@ -5,7 +5,57 @@ import requests
 import urllib
 import json
 import time
+import twitter
+from apscheduler.scheduler import Scheduler
 
+class BalancedStatusTwitter(object):
+    def __init__(self, bot):
+        fp = open('balance.sfu', 'r')
+        data = json.loads(fp.read())
+        fp.close()
+        
+        self.api = twitter.Api(
+                          consumer_key='U7mDscdgAz927V333rkbA',
+                          consumer_secret=data['twitter']['consumer'],
+                          access_token_key='369887502-DxaJqgKNjhISaGKMFsiJE52y1OEeVOQzm9e1rD3i',
+                          access_token_secret=data['twitter']['access_token'])
+        
+        self.bot = bot
+        
+        self.load()
+        
+    def status(self):
+        statuses = self.api.GetUserTimeline(screen_name="balancedstatus", since_id=self.minid, count=1)
+        
+        if statuses[0].id > self.minid:
+            self.minid = statuses[0].id
+            #self.save()
+                
+        for s in statuses:
+            self.bot.send("@balancedstatus at %s: %s" % (s.created_at, s.text))
+    
+    """
+    Figure out why this won't store, or use Redis instead of flat file for saving.
+    """
+    def save(self):
+        try:
+            fp = open('twitter.stats', 'w')
+            fp.write(str(self.minid))
+            fp.close()
+        except:
+            pass
+        
+    def load(self):
+        try:
+            fp = open('twitter.stats', 'r')
+            self.minid = fp.read()
+            fp.close()
+            
+            if not self.minid:
+                self.minid = 0
+        except:
+            self.minid = 0
+            
 class GitBot(object):
     """
     @param host: The IRC server to connect to
@@ -360,9 +410,18 @@ class GitBot(object):
                     del self.admins[name]
                 elif perm[0] == "+":
                     self.admins[name] = "*"
+        
+bot = GitBot(chan="secforus", nick="sfu%d" % (time.time()))
+#bot = GitBot()
 
-#bot = GitBot(chan="secforus", nick="sfu%d" % (time.time()))
-bot = GitBot()
+tweet = BalancedStatusTwitter(bot)
+
+config = {'apscheduler.jobstores.file.class': 'apscheduler.jobstores.shelve_store:ShelveJobStore',
+          'apscheduler.jobstores.file.path': '/tmp/dbfile'}
+sched = Scheduler(config)
+sched.start()
+
+sched.add_cron_job(tweet.status, month='*', day='*', year='*', hour='*', minute='*', second='*/30')
 
 try:
     while True:
@@ -372,3 +431,4 @@ except:
 
 print "Shutting down Gitbot..."
 bot.close()
+sched.shutdown()
