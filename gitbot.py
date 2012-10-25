@@ -411,8 +411,8 @@ class GitBot(object):
                 elif perm[0] == "+":
                     self.admins[name] = "*"
         
-bot = GitBot(chan="secforus", nick="sfu%d" % (time.time()))
-#bot = GitBot()
+#bot = GitBot(chan="secforus", nick="sfu%d" % (time.time()))
+bot = GitBot()
 
 tweet = BalancedStatusTwitter(bot)
 
