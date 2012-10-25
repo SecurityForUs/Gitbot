@@ -105,6 +105,8 @@ class GitBot(object):
         # Get a list of 'user''s repos
         r = self.github("users/:acct:/repos", get_args={'type' : type})
         
+        # Turning the repo list into a dictionary, and adding a prefix to the value
+        # This makes it possible to work with non-prefixed repos
         repos = {}
         prefix = "balanced-"
         name = ""
@@ -122,11 +124,17 @@ class GitBot(object):
         
         return repos.keys()
     
+    """
+    Returns a properly formatted repo name.
+    """
     def repo_name(self, id):
         pref = self.repos[id]
         
         return "%s%s" % (pref, id)
     
+    """
+    Simply checks to see if the user is an admin
+    """
     def check_admin(self):
         if not self.admins:
             return False
@@ -154,6 +162,7 @@ class GitBot(object):
         except:
             pass
         
+        # Original way for bot to send GitHub requests (looked down upon now but here for rememberance)
         if cmd == "issue":
             repo_lookup = self.get_repos()
             
@@ -176,7 +185,7 @@ class GitBot(object):
                 return False
             
             if repo in repo_lookup:
-                repo = "balanced-%s" % (repo)
+                repo = self.repo_name(repo)
                 
                 try:
                     terms = int(terms)
@@ -186,9 +195,13 @@ class GitBot(object):
             else:
                 self.send("Balanced does not have GitHub repo named balanced-%s" % (repo))
         elif cmd == "tell":
-            who,_,repo,phrase = args.split(" ", 3)
+            """
+            This command makes Gitbot PM a particular user all the useful links it finds on GitHub.
+            """
             
-            repo = "balanced-%s" % (repo)
+            # Parse who to send it to, the command (non-used), what repo and the search phrase
+            who,_,repo,phrase = args.split(" ", 3)
+            repo = self.repo_name(repo)
             
             try:
                 phrase = int(phrase)
@@ -196,6 +209,7 @@ class GitBot(object):
             except ValueError:
                 self.issue_lookup(repo, "s",  phrase, to_who=who)
         elif cmd == "hub" and self.check_admin():
+            # Changes the GitHub account to work with
             self.setacct(args)
         elif cmd == "list":
             if args == "repo":
@@ -203,7 +217,8 @@ class GitBot(object):
             elif args == "admins":
                 self.send("The following admins are: %s" % (', '.join(self.admins.keys())))
         elif cmd == "help":
-            self.send("Balanced Payments IRC bot written by secforus_ehansen to assist Balanced members in providing GitHub information.  Available commands: list <repo|admins>, issue <repo suffix> <issue # or terms>")
+            self.send("Balanced Payments IRC bot.  Connects to the balanced GitHub to assist Balanced team.")
+            self.send("Commands: list <repo> <issue # or search term>, tell <user> about <repo> <criteria>, list <admins|repo>, help.  To search for issues by label, append criteria with \"labels:\"")
             self.send("Want to improve this bot?  Want to use it for your own channel?  Fork it at https://github.com/SecurityForUs/Gitbot")
         elif cmd == "make":
             if args == "me a sandwich":
@@ -218,28 +233,35 @@ class GitBot(object):
     Sends 'msg' to the person marked as 'to'.  If 'pm' is true, send it to the channel, otherwise to the server itself.
     """
     def send(self, msg, to=None, pm = True, prefix=None, chan=True):
+        # Prefix the message?
         if prefix:
             msg = "%s %s" % (prefix, msg)
         
+        # If sending to the channel, make sure we do so, otherwise we're sending it to a user
+        # Suggested by zealoushacker
         if chan:
             recip = "#%s" % (self.chan)
         else:
             recip = to
-            
+        
+        # PM is for everything but server (i.e.: PONG) requests
         if pm:
             self.sock.send("PRIVMSG %s :%s\n" % (recip, msg))
         else:
             self.sock.send("%s\n" % (msg))
     
+    # Gets the username of the person who sent the last known message
     def getsender(self):
         return self.msg.split(":", 3)[1].split("!")[0]
         
     """
     Wrote into it's own function to make things simpler for myself.
+    
+    Also handles label searching (thanks joonas for the idea)
     """
     def issue_lookup(self, repo, stype, search, to_who=None):
         issues = []
-        
+            
         if stype is "i":
             tmp = self.github("repos/:acct:/%s/issues/%d" % (repo, search))
             try:
@@ -249,13 +271,38 @@ class GitBot(object):
             
             issues.append(tmp)
         else:
-            call = self.legacy_github(repo, search)
+            # By default we won't search based on labels
+            label_search = False
             
-            try:
-                issues = call['issues']
-            except:
-                pass
+            # However, if such keywords are found, then so be it
+            if search.find("label:") != -1 or search.find("labels:") != -1:
+                labels = search.split("label:")
+                
+                # 'label:" wasn't found, so we got 'labels:' instead
+                if labels[0] == search:
+                    labels = search.split("labels:")[1].split(" ")
+                    labels = ','.join(labels)
+                else:
+                    labels = labels[1]
+                    
+            label_search = True
+            
+            if not label_search:
+                call = self.legacy_github(repo, search)
+                
+                try:
+                    issues = call['issues']
+                except:
+                    pass
+            else:
+                call = self.github("repos/:acct:/%s/issues" % (repo), get_args={'labels' : labels})
+                
+                try:
+                    issues = call['issues']
+                except:
+                    issues = call
         
+        # Get the total amount of issues found by whatever method of searching we used
         res = len(issues)
         
         try:
@@ -268,12 +315,20 @@ class GitBot(object):
             i = 1
             
             for issue in issues:
+                if label_search:
+                    issue['user'] = issue['user']['login']
+                    
                 self.send("%s created an issue titled \"%s\" that is %s at %s" % (issue['user'], issue['title'], issue['state'], issue['html_url']), to=to_who, prefix="[%d/%d]" % (i, res), chan=False)
                 i += 1
+                
+                # sleep() is used to help control flooding the channel
                 time.sleep(2)
         except:
             self.send("%s, unable to find any open issues with the provided search criteria" % (self.getsender()))
-            
+    
+    """
+    Receives data from the IRC server, and then we can parse it!
+    """
     def recv(self,debug=False):
         msg = str(self.sock.recv(2048)).strip()
         
@@ -311,7 +366,7 @@ bot = GitBot()
 
 try:
     while True:
-        bot.recv(True)
+        bot.recv()
 except:
     pass
 
