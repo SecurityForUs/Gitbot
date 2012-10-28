@@ -29,8 +29,8 @@ class Client(object):
             
         # Establish a connection to Freenode
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        #self.sock.connect(("irc.freenode.net",6667))
-        self.sock.connect(("localhost", 6667))
+        self.sock.connect(("irc.freenode.net",6667))
+        #self.sock.connect(("localhost", 6667))
         
         # Makes reading the socket a lot easier
         self.f = self.sock.makefile()
