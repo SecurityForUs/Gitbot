@@ -400,8 +400,11 @@ def bot_sendlink(irc, msg):
         to = args[0]
         repo = args[1]
         
-        url = "https://www.github.com/balanced/%s" % (irc.git[repo])
-        
+        if repo in irc.git.get_repos():
+            url = "https://www.github.com/balanced/%s" % (irc.git[repo])
+        elif repo == "balanced":
+            url = "https://www.balancedpayments.com"
+            
         try:
             url = "%s/%s" % (url, args[2])
         except IndexError:
