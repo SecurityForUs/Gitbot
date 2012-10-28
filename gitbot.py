@@ -436,6 +436,8 @@ sched.start()
 Twitter's GetUserTimeline call is rate-limited to 180 calls/hour.  This essentially amounts to:
 
 2x calls in 1 minute = 120 calls/hour (2*60)
+
+To max out the calls/hour, set second to */20 (3x calls/minute = 180 calls/hour)
 """
 sched.add_cron_job(twitter.status, month='*', day='*', year='*', hour='*', minute='*', second='*/30')
 """
