@@ -431,8 +431,13 @@ config = {'apscheduler.jobstores.file.class': 'apscheduler.jobstores.shelve_stor
 sched = Scheduler(config)
 sched.start()
 
-# Twitter feed is checked for updates every 10 seconds
-sched.add_cron_job(twitter.status, month='*', day='*', year='*', hour='*', minute='*', second='*/10')
+# Twitter feed is checked for updates every 30 seconds
+"""
+Twitter's GetUserTimeline call is rate-limited to 180 calls/hour.  This essentially amounts to:
+
+2x calls in 1 minute = 120 calls/hour (2*60)
+"""
+sched.add_cron_job(twitter.status, month='*', day='*', year='*', hour='*', minute='*', second='*/30')
 """
 Nothing more than debugging info being left in case of usefulness in logging...
 
