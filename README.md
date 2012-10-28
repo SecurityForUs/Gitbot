@@ -39,6 +39,18 @@ Gitbot now allows searching by issue #, keywords or labels:
 # Keywords
 !search api ach international
 
-# Labels
+# Labels (label: can also be used)
+# If searching more than 1 label at the same time, must be comma-separated list
 !search api labels:ach,approved
 ```
+GitBot also allows sending GitHub links to someone:
+```python
+!send <nick> <repo> [subdirectory]
+
+# To send someone to balanced-api
+!send someone api
+
+# To send someone to balanced-python's issues
+!send someone python issues
+```
+This will send <nick> a PM with the full GitHub link.
