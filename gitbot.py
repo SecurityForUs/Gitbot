@@ -13,6 +13,9 @@ import bst
 # Used for scheduling fetching new Twitter updates
 from apscheduler.scheduler import Scheduler
 
+# Used for doing some logging
+import logging
+
 class Client(object):
     def __init__(self, chan="balanced", nick="balanced_man", nickpass=None, trigger="gitbot"):
         # Store some stuff and get an instance of the GitHub class
@@ -29,8 +32,8 @@ class Client(object):
             
         # Establish a connection to Freenode
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect(("irc.freenode.net",6667))
-        #self.sock.connect(("localhost", 6667))
+        #self.sock.connect(("irc.freenode.net",6667))
+        self.sock.connect(("localhost", 6667))
         
         # Makes reading the socket a lot easier
         self.f = self.sock.makefile()
@@ -67,7 +70,7 @@ class Client(object):
         
     def start(self):
         # Debugging information that I should turn into a log
-        print "Processing the current  commands:",self.cmds
+        #self.log.info("Found the following command hooks: %s" % (self.cmds))
         
         # Initalize thread references
         self.incoming_thread = threading.Thread(target=self.incoming_thread, args=(self.f, self.in_lock))
@@ -76,8 +79,8 @@ class Client(object):
         self.command_thread = threading.Thread(target=self.process_commands, args=(self.in_lock,))
         
         #Put the first two message to send into the outgoing queue
-        self.out_msgs.append(( 0, "USER" ))
-        self.out_msgs.append(( 0, "NICK" ))
+        self.out_msgs.append((0, "USER"))
+        self.out_msgs.append((0, "NICK"))
         
         # Start all of the threads so they can run
         self.incoming_thread.start()
@@ -128,6 +131,8 @@ class Client(object):
     Tell the server the bot wants to join a specific channel
     """
     def irc_join(self):
+        #self.log.info("Joining channel %s" % (self.chan))
+        
         self.server_msg("JOIN #%s" % (self.chan))
         self.joined = True
     
@@ -189,6 +194,8 @@ class Client(object):
                 
                 for cmd in self.cmds:
                     if cmd[0] == c:
+                        #self.log.debug("Running command \"%s\"" % (c))
+                        
                         cmd[1](self, m)
                         break
             
@@ -357,7 +364,7 @@ class Client(object):
         if m:
             return (1, "NOTICE", m.group(1), m.group(2), m.group(3), m.group(4), m.group(5))
             
-        return ( 9999, "SKIP" )
+        return (9999, "SKIP")
     
     """
     Disconnect from the server (the print line is required or else the bot won't disconnect)
@@ -366,7 +373,10 @@ class Client(object):
         print "Quitting"
         self.running = False
         self.sock.close()
-    
+
+"""
+Sends some helpful information to whoever requested it
+"""
 def bot_help(irc, msg):
     irc.user_msg(msg[0], "GitHub Assistant Bot for Balanced Payments")
     irc.user_msg(msg[0], "Written by secforus_ehansen of Security For Us, LLC.  Fork this bot at https://github.com/SecurityForUs/Gitbot")
@@ -376,15 +386,33 @@ def bot_help(irc, msg):
     irc.user_msg(msg[0], "Label searching:")
     irc.user_msg(msg[0], "Replace search keywords with label:<comma separated list>")
     irc.user_msg(msg[0], "To search by label(s) instead, prepend labels with \"label:\" or \"labels:\"")
-    irc.user_msg(msg[0], "View current admins: !admins")
+    irc.user_msg(msg[0], "Send someone a GitHub link from balanced: !send <user> <repo> [subdirectory (i.e.: issues)]")
     irc.user_msg(msg[0], "List repos: !repos")
 
 def bot_kill(irc, msg):
     print "Called bot_kill"
     irc.quit()
 
+def bot_sendlink(irc, msg):
+    args = str(msg[5]).split(" ")
+    
+    try:
+        to = args[0]
+        repo = args[1]
+        
+        url = "https://www.github.com/balanced/%s" % (irc.git[repo])
+        
+        try:
+            url = "%s/%s" % (url, args[2])
+        except IndexError:
+            pass
+        
+        irc.user_msg(to, "%s wants you to check out the following link: %s" % (msg[0], url))
+    except:
+        irc.user_msg(msg[0], "To send a link to someone: !send <nick> <repo> [subdirectory (i.e.: issues)]")
+        
 def bot_list_repos(irc, msg):
-    irc.chan_msg("Repos for https://www.github.com/%s: %s" % (irc.git.acct, ', '.join(irc.git.get_repos())))
+    irc.user_msg(msg[0], "Repos for https://www.github.com/%s: %s" % (irc.git.acct, ', '.join(irc.git.get_repos())))
 
 def bot_gitlook(irc, msg):
     try:
@@ -415,7 +443,7 @@ def bot_gitlook(irc, msg):
     except KeyError:
         irc.user_msg(msg[0], "For one reason or another one or more arguments went missing.  Please try again.")
         
-irc = Client()
+irc = Client(chan="test")
 
 irc.register_command("help", bot_help)
 # For safety reasons not using this....
@@ -423,6 +451,7 @@ irc.register_command("help", bot_help)
 irc.register_command("repos", bot_list_repos)
 irc.register_command("search", bot_gitlook)
 irc.register_command("inform", bot_gitlook)
+irc.register_command("send", bot_sendlink)
 
 twitter = bst.BalancedStatusTwitter(irc)
 
