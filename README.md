@@ -28,7 +28,7 @@ Client(nick="SomeNickBot")
 Client(nick="SomeNickBot", nick_pass="p$ass")
 
 # To have Gitbot listen for a different event
-GitBot(trigger="pulled")
+Client(trigger="pulled")
 ```
 
 Gitbot now allows searching by issue #, keywords or labels:
