@@ -54,3 +54,11 @@ GitBot also allows sending GitHub links to someone:
 !send someone python issues
 ```
 This will send <nick> a PM with the full GitHub link.
+
+If instead you want to direct someone to a page on www.balancedpayments.com, you just do this:
+```python
+!send <nick> balanced [subdirectory]
+
+# Send them to the payment flow page
+!send someone balanced flow
+```
