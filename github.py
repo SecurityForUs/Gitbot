@@ -81,6 +81,9 @@ class GitHub(object):
         
         return "%s%s" % (pref, id)
     
+    def __getitem__(self, id):
+        return self.repo_name(id)
+    
     """
     Wrote into it's own function to make things simpler for myself.
     
