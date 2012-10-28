@@ -369,7 +369,7 @@ class Client(object):
     
 def bot_help(irc, msg):
     irc.user_msg(msg[0], "GitHub Assistant Bot for Balanced Payments")
-    irc.user_msg(msg[0], "Written by secforus_ehansen of Security For Us, LLC.  Fork this bot at https://github.com/SecurityForUs/Gitbot/tree/v2")
+    irc.user_msg(msg[0], "Written by secforus_ehansen of Security For Us, LLC.  Fork this bot at https://github.com/SecurityForUs/Gitbot")
     irc.user_msg(msg[0], "Issue searching:")
     irc.user_msg(msg[0], "!search <repo> <issue number or keywords>")
     irc.user_msg(msg[0], "!inform <nick> about <repo> <issue number or keywords>")
