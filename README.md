@@ -6,7 +6,7 @@ IRC bot to interface with GitHub
 Requirements
 ======
 Python 2.7 (not tested with any others)
-Requests (to send/receive GitHub API calls)
+- see requirements.txt for more -
 
 Installation
 ============
@@ -19,26 +19,26 @@ By default, Gitbot connects to Freenode's networks.  To specify different portio
 
 ```python
 # Connect to #git on irc.freenode.net
-GitBot(chan="git")
+Client(chan="git")
 
 # To have the bot be a different name
-GitBot(nick="SomeNickBot")
+Client(nick="SomeNickBot")
+
+# If the nick has a nickserv password
+Client(nick="SomeNickBot", nick_pass="p$ass")
 
 # To have Gitbot listen for a different event
-GitBot(cmd_start="mesg_trigger_text here")
-
-# Have Gitbot service a GitHub
-GitBot(acct="github_username")
+GitBot(trigger="pulled")
 ```
 
-By default, if you want to have Gitbot search for issues, there's two choices:
-
+Gitbot now allows searching by issue #, keywords or labels:
 ```python
 # Issue number
-gitbot issue 6
+!search python 6
 
-# Topic/subject
-gitbot issue flying geese are not turtles
+# Keywords
+!search api ach international
+
+# Labels
+!search api labels:ach,approved
 ```
-
-To assist against flood control, Gitbot only returns the first result on success.
