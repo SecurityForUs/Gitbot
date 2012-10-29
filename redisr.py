@@ -63,6 +63,9 @@ class Redisr(object):
     def read(self, name):
         return self.load(name)
     
+    """
+    Simple wrapper of sorts to allow calling class['key'] instead of class.load/read().
+    """
     @rcheck
     def __getitem__(self, index):
         return self.load(index)
