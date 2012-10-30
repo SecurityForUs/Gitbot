@@ -132,8 +132,8 @@ class Client(object):
     """
     def irc_join(self):
         #self.log.info("Joining channel %s" % (self.chan))
-        
         self.server_msg("JOIN #%s" % (self.chan))
+        self.chan_msg("Hey everyone.  If you're not sure how to use me, just say !help")
         self.joined = True
     
     """
