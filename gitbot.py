@@ -467,7 +467,7 @@ def bot_sendapirst(irc, msg):
     irc.user_msg(to, "%s wants you to view an API resource: %s" % (msg[0], url))
 
 #irc = Client(chan="test")
-irc = Client(chan="test")
+irc = Client()
 
 irc.register_command("help", bot_help)
 # For safety reasons not using this....
