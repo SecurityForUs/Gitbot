@@ -383,11 +383,11 @@ def bot_help(irc, msg):
     irc.user_msg(msg[0], "Issue searching:")
     irc.user_msg(msg[0], "!search <repo> <issue number or keywords>")
     irc.user_msg(msg[0], "!inform <nick> about <repo> <issue number or keywords>")
-    irc.user_msg(msg[0], "Label searching:")
-    irc.user_msg(msg[0], "Replace search keywords with label:<comma separated list>")
     irc.user_msg(msg[0], "To search by label(s) instead, prepend labels with \"label:\" or \"labels:\"")
     irc.user_msg(msg[0], "Send someone a GitHub link from balanced: !send <user> <repo> [subdirectory (i.e.: issues)]")
     irc.user_msg(msg[0], "List repos: !repos")
+    irc.user_msg(msg[0], "Send an RST link to user: !rst <nick> <rst name> (.rst is appended automatically)")
+    irc.user_msg(msg[0], "Send an RST link to the channel: !rst <rst name> (.rst is appended automatically)")
 
 def bot_kill(irc, msg):
     print "Called bot_kill"
@@ -450,7 +450,12 @@ def bot_sendapirst(irc, msg):
     args = str(msg[5]).split(" ")
 
     to = args[0]
-    rst = args[1]
+
+    try:
+        rst = args[1]
+    except IndexError:
+        to = "#%s" % (irc.chan)
+        rst = args[0]
 
     url = "https://github.com/balanced/balanced-api"
 
