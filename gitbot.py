@@ -445,7 +445,22 @@ def bot_gitlook(irc, msg):
         irc.user_msg(msg[0], "If you need help on how to use %s, please say !help" % (irc.nick))
     except KeyError:
         irc.user_msg(msg[0], "For one reason or another one or more arguments went missing.  Please try again.")
-        
+
+def bot_sendapirst(irc, msg):
+    args = str(msg[5]).split(" ")
+
+    to = args[0]
+    rst = args[1]
+
+    url = "https://github.com/balanced/balanced-api"
+
+    if rst == "errors":
+        url = "%s/errors.rst" % (url)
+    else:
+        url = "%s/resources/%s.rst" % (url, rst)
+
+    irc.user_msg(to, "%s wants you to view an API resource: %s" % (msg[0], url))
+
 irc = Client(chan="test")
 
 irc.register_command("help", bot_help)
