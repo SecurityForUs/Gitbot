@@ -32,8 +32,8 @@ class Client(object):
             
         # Establish a connection to Freenode
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        #self.sock.connect(("irc.freenode.net",6667))
-        self.sock.connect(("localhost", 6667))
+        self.sock.connect(("irc.freenode.net",6667))
+        #self.sock.connect(("localhost", 6667))
         
         # Makes reading the socket a lot easier
         self.f = self.sock.makefile()
@@ -466,6 +466,7 @@ def bot_sendapirst(irc, msg):
 
     irc.user_msg(to, "%s wants you to view an API resource: %s" % (msg[0], url))
 
+#irc = Client(chan="test")
 irc = Client(chan="test")
 
 irc.register_command("help", bot_help)
