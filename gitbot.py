@@ -460,9 +460,9 @@ def bot_sendapirst(irc, msg):
     url = "https://github.com/balanced/balanced-api"
 
     if rst == "errors":
-        url = "%s/errors.rst" % (url)
+        url = "%s/blob/master/errors.rst" % (url)
     else:
-        url = "%s/resources/%s.rst" % (url, rst)
+        url = "%s/blob/master/resources/%s.rst" % (url, rst)
 
     irc.user_msg(to, "%s wants you to view an API resource: %s" % (msg[0], url))
 
