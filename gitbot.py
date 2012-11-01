@@ -470,6 +470,7 @@ irc.register_command("repos", bot_list_repos)
 irc.register_command("search", bot_gitlook)
 irc.register_command("inform", bot_gitlook)
 irc.register_command("send", bot_sendlink)
+irc.register_command("rst", bot_sendapirst)
 
 twitter = bst.BalancedStatusTwitter(irc)
 
